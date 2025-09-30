@@ -18,7 +18,7 @@ func NullTranslationHelper(_ string, defaultValue string) string {
 
 func TranslationHelper() (TranslationHelperFunc, func()) {
 	var translationKeyMap = map[string]string{}
-	v := viper.New()
+    v := viper.New()
 
 	// Load from JSON file
 	v.SetConfigName("github-mcp-server-config")
@@ -32,22 +32,24 @@ func TranslationHelper() (TranslationHelperFunc, func()) {
 		}
 	}
 
-	// create a function that takes both a key, and a default value and returns either the default value or an override value
-	return func(key string, defaultValue string) string {
-			key = strings.ToUpper(key)
-			if value, exists := translationKeyMap[key]; exists {
-				return value
-			}
-			// check if the env var exists
-			if value, exists := os.LookupEnv("GITHUB_MCP_" + key); exists {
-				// TODO I could not get Viper to play ball reading the env var
-				translationKeyMap[key] = value
-				return value
-			}
+    // Ensure environment variable support with the expected prefix and key format
+    v.AutomaticEnv()
+    v.SetEnvPrefix("GITHUB_MCP")
+    v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
-			v.SetDefault(key, defaultValue)
-			translationKeyMap[key] = v.GetString(key)
-			return translationKeyMap[key]
+    // create a function that takes both a key, and a default value and returns either the default value or an override value
+	return func(key string, defaultValue string) string {
+            // Normalize the key to upper snake-case for env lookups and viper
+            normalizedKey := strings.ToUpper(strings.ReplaceAll(key, "-", "_"))
+            if value, exists := translationKeyMap[normalizedKey]; exists {
+                return value
+            }
+
+            // Set default and then read via viper which respects env overrides
+            v.SetDefault(normalizedKey, defaultValue)
+            resolved := v.GetString(normalizedKey)
+            translationKeyMap[normalizedKey] = resolved
+            return resolved
 		}, func() {
 			// dump the translationKeyMap to a json file
 			if err := DumpTranslationKeyMap(translationKeyMap); err != nil {

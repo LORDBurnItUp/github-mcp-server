@@ -152,9 +152,13 @@ func (t *Toolset) SetReadOnly() {
 func (t *Toolset) AddWriteTools(tools ...server.ServerTool) *Toolset {
 	// Silently ignore if the toolset is read-only to avoid any breach of that contract
 	for _, tool := range tools {
-		if *tool.Tool.Annotations.ReadOnlyHint {
-			panic(fmt.Sprintf("tool (%s) is incorrectly annotated as read-only", tool.Tool.Name))
-		}
+        // Guard against nil annotations or hints to avoid panics.
+        // We only block if the tool is explicitly annotated as read-only.
+        if tool.Tool.Annotations != nil && tool.Tool.Annotations.ReadOnlyHint != nil {
+            if *tool.Tool.Annotations.ReadOnlyHint {
+                panic(fmt.Sprintf("tool (%s) is incorrectly annotated as read-only", tool.Tool.Name))
+            }
+        }
 	}
 	if !t.readOnly {
 		t.writeTools = append(t.writeTools, tools...)
@@ -164,9 +168,10 @@ func (t *Toolset) AddWriteTools(tools ...server.ServerTool) *Toolset {
 
 func (t *Toolset) AddReadTools(tools ...server.ServerTool) *Toolset {
 	for _, tool := range tools {
-		if !*tool.Tool.Annotations.ReadOnlyHint {
-			panic(fmt.Sprintf("tool (%s) must be annotated as read-only", tool.Tool.Name))
-		}
+        // Read tools must be explicitly annotated as read-only. Treat missing/ nil as invalid.
+        if tool.Tool.Annotations == nil || tool.Tool.Annotations.ReadOnlyHint == nil || !*tool.Tool.Annotations.ReadOnlyHint {
+            panic(fmt.Sprintf("tool (%s) must be annotated as read-only", tool.Tool.Name))
+        }
 	}
 	t.readTools = append(t.readTools, tools...)
 	return t
