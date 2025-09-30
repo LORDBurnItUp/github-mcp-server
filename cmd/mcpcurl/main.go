@@ -423,38 +423,52 @@ func printResponse(response string, prettyPrint bool) error {
 		return fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
-	// Extract text from content items of type "text"
-	for _, content := range resp.Result.Content {
-		if content.Type == "text" {
-			var textContentObj map[string]interface{}
-			err := json.Unmarshal([]byte(content.Text), &textContentObj)
+    // Extract text from content items of type "text"
+    printedAny := false
+    for _, content := range resp.Result.Content {
+        if content.Type != "text" {
+            continue
+        }
 
-			if err == nil {
-				prettyText, err := json.MarshalIndent(textContentObj, "", "  ")
-				if err != nil {
-					return fmt.Errorf("failed to pretty print text content: %w", err)
-				}
-				fmt.Println(string(prettyText))
-				continue
-			}
+        // Try object
+        var textContentObj map[string]interface{}
+        if err := json.Unmarshal([]byte(content.Text), &textContentObj); err == nil {
+            prettyText, err := json.MarshalIndent(textContentObj, "", "  ")
+            if err != nil {
+                // If pretty print fails, fall back to raw content
+                fmt.Println(content.Text)
+                printedAny = true
+                continue
+            }
+            fmt.Println(string(prettyText))
+            printedAny = true
+            continue
+        }
 
-			// Fallback parsing as JSONL
-			var textContentList []map[string]interface{}
-			if err := json.Unmarshal([]byte(content.Text), &textContentList); err != nil {
-				return fmt.Errorf("failed to parse text content as a list: %w", err)
-			}
-			prettyText, err := json.MarshalIndent(textContentList, "", "  ")
-			if err != nil {
-				return fmt.Errorf("failed to pretty print array content: %w", err)
-			}
-			fmt.Println(string(prettyText))
-		}
-	}
+        // Try array (JSONL-style content serialized as array)
+        var textContentList []map[string]interface{}
+        if err := json.Unmarshal([]byte(content.Text), &textContentList); err == nil {
+            prettyText, err := json.MarshalIndent(textContentList, "", "  ")
+            if err != nil {
+                fmt.Println(content.Text)
+                printedAny = true
+                continue
+            }
+            fmt.Println(string(prettyText))
+            printedAny = true
+            continue
+        }
+
+        // If not JSON, print as-is
+        fmt.Println(content.Text)
+        printedAny = true
+    }
 
 	// If no text content found, print the original response
-	if len(resp.Result.Content) == 0 {
-		fmt.Println(response)
-	}
+    if !printedAny {
+        // No printable text content found; print the original response
+        fmt.Println(response)
+    }
 
 	return nil
 }
