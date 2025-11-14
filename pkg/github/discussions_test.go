@@ -9,7 +9,7 @@ import (
 
 	"github.com/github/github-mcp-server/internal/githubv4mock"
 	"github.com/github/github-mcp-server/pkg/translations"
-	"github.com/google/go-github/v73/github"
+	"github.com/google/go-github/v77/github"
 	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,85 +17,253 @@ import (
 
 var (
 	discussionsGeneral = []map[string]any{
-		{"number": 1, "title": "Discussion 1 title", "createdAt": "2023-01-01T00:00:00Z", "url": "https://github.com/owner/repo/discussions/1", "category": map[string]any{"name": "General"}},
-		{"number": 3, "title": "Discussion 3 title", "createdAt": "2023-03-01T00:00:00Z", "url": "https://github.com/owner/repo/discussions/3", "category": map[string]any{"name": "General"}},
+		{"number": 1, "title": "Discussion 1 title", "createdAt": "2023-01-01T00:00:00Z", "updatedAt": "2023-01-01T00:00:00Z", "author": map[string]any{"login": "user1"}, "url": "https://github.com/owner/repo/discussions/1", "category": map[string]any{"name": "General"}},
+		{"number": 3, "title": "Discussion 3 title", "createdAt": "2023-03-01T00:00:00Z", "updatedAt": "2023-02-01T00:00:00Z", "author": map[string]any{"login": "user1"}, "url": "https://github.com/owner/repo/discussions/3", "category": map[string]any{"name": "General"}},
 	}
 	discussionsAll = []map[string]any{
-		{"number": 1, "title": "Discussion 1 title", "createdAt": "2023-01-01T00:00:00Z", "url": "https://github.com/owner/repo/discussions/1", "category": map[string]any{"name": "General"}},
-		{"number": 2, "title": "Discussion 2 title", "createdAt": "2023-02-01T00:00:00Z", "url": "https://github.com/owner/repo/discussions/2", "category": map[string]any{"name": "Questions"}},
-		{"number": 3, "title": "Discussion 3 title", "createdAt": "2023-03-01T00:00:00Z", "url": "https://github.com/owner/repo/discussions/3", "category": map[string]any{"name": "General"}},
+		{
+			"number":    1,
+			"title":     "Discussion 1 title",
+			"createdAt": "2023-01-01T00:00:00Z",
+			"updatedAt": "2023-01-01T00:00:00Z",
+			"author":    map[string]any{"login": "user1"},
+			"url":       "https://github.com/owner/repo/discussions/1",
+			"category":  map[string]any{"name": "General"},
+		},
+		{
+			"number":    2,
+			"title":     "Discussion 2 title",
+			"createdAt": "2023-02-01T00:00:00Z",
+			"updatedAt": "2023-02-01T00:00:00Z",
+			"author":    map[string]any{"login": "user2"},
+			"url":       "https://github.com/owner/repo/discussions/2",
+			"category":  map[string]any{"name": "Questions"},
+		},
+		{
+			"number":    3,
+			"title":     "Discussion 3 title",
+			"createdAt": "2023-03-01T00:00:00Z",
+			"updatedAt": "2023-03-01T00:00:00Z",
+			"author":    map[string]any{"login": "user3"},
+			"url":       "https://github.com/owner/repo/discussions/3",
+			"category":  map[string]any{"name": "General"},
+		},
 	}
+
+	discussionsOrgLevel = []map[string]any{
+		{
+			"number":    1,
+			"title":     "Org Discussion 1 - Community Guidelines",
+			"createdAt": "2023-01-15T00:00:00Z",
+			"updatedAt": "2023-01-15T00:00:00Z",
+			"author":    map[string]any{"login": "org-admin"},
+			"url":       "https://github.com/owner/.github/discussions/1",
+			"category":  map[string]any{"name": "Announcements"},
+		},
+		{
+			"number":    2,
+			"title":     "Org Discussion 2 - Roadmap 2023",
+			"createdAt": "2023-02-20T00:00:00Z",
+			"updatedAt": "2023-02-20T00:00:00Z",
+			"author":    map[string]any{"login": "org-admin"},
+			"url":       "https://github.com/owner/.github/discussions/2",
+			"category":  map[string]any{"name": "General"},
+		},
+		{
+			"number":    3,
+			"title":     "Org Discussion 3 - Roadmap 2024",
+			"createdAt": "2023-02-20T00:00:00Z",
+			"updatedAt": "2023-02-20T00:00:00Z",
+			"author":    map[string]any{"login": "org-admin"},
+			"url":       "https://github.com/owner/.github/discussions/3",
+			"category":  map[string]any{"name": "General"},
+		},
+		{
+			"number":    4,
+			"title":     "Org Discussion 4 - Roadmap 2025",
+			"createdAt": "2023-02-20T00:00:00Z",
+			"updatedAt": "2023-02-20T00:00:00Z",
+			"author":    map[string]any{"login": "org-admin"},
+			"url":       "https://github.com/owner/.github/discussions/4",
+			"category":  map[string]any{"name": "General"},
+		},
+	}
+
+	// Ordered mock responses
+	discussionsOrderedCreatedAsc = []map[string]any{
+		discussionsAll[0], // Discussion 1 (created 2023-01-01)
+		discussionsAll[1], // Discussion 2 (created 2023-02-01)
+		discussionsAll[2], // Discussion 3 (created 2023-03-01)
+	}
+
+	discussionsOrderedUpdatedDesc = []map[string]any{
+		discussionsAll[2], // Discussion 3 (updated 2023-03-01)
+		discussionsAll[1], // Discussion 2 (updated 2023-02-01)
+		discussionsAll[0], // Discussion 1 (updated 2023-01-01)
+	}
+
+	// only 'General' category discussions ordered by created date descending
+	discussionsGeneralOrderedDesc = []map[string]any{
+		discussionsGeneral[1], // Discussion 3 (created 2023-03-01)
+		discussionsGeneral[0], // Discussion 1 (created 2023-01-01)
+	}
+
 	mockResponseListAll = githubv4mock.DataResponse(map[string]any{
 		"repository": map[string]any{
-			"discussions": map[string]any{"nodes": discussionsAll},
+			"discussions": map[string]any{
+				"nodes": discussionsAll,
+				"pageInfo": map[string]any{
+					"hasNextPage":     false,
+					"hasPreviousPage": false,
+					"startCursor":     "",
+					"endCursor":       "",
+				},
+				"totalCount": 3,
+			},
 		},
 	})
 	mockResponseListGeneral = githubv4mock.DataResponse(map[string]any{
 		"repository": map[string]any{
-			"discussions": map[string]any{"nodes": discussionsGeneral},
+			"discussions": map[string]any{
+				"nodes": discussionsGeneral,
+				"pageInfo": map[string]any{
+					"hasNextPage":     false,
+					"hasPreviousPage": false,
+					"startCursor":     "",
+					"endCursor":       "",
+				},
+				"totalCount": 2,
+			},
 		},
 	})
+	mockResponseOrderedCreatedAsc = githubv4mock.DataResponse(map[string]any{
+		"repository": map[string]any{
+			"discussions": map[string]any{
+				"nodes": discussionsOrderedCreatedAsc,
+				"pageInfo": map[string]any{
+					"hasNextPage":     false,
+					"hasPreviousPage": false,
+					"startCursor":     "",
+					"endCursor":       "",
+				},
+				"totalCount": 3,
+			},
+		},
+	})
+	mockResponseOrderedUpdatedDesc = githubv4mock.DataResponse(map[string]any{
+		"repository": map[string]any{
+			"discussions": map[string]any{
+				"nodes": discussionsOrderedUpdatedDesc,
+				"pageInfo": map[string]any{
+					"hasNextPage":     false,
+					"hasPreviousPage": false,
+					"startCursor":     "",
+					"endCursor":       "",
+				},
+				"totalCount": 3,
+			},
+		},
+	})
+	mockResponseGeneralOrderedDesc = githubv4mock.DataResponse(map[string]any{
+		"repository": map[string]any{
+			"discussions": map[string]any{
+				"nodes": discussionsGeneralOrderedDesc,
+				"pageInfo": map[string]any{
+					"hasNextPage":     false,
+					"hasPreviousPage": false,
+					"startCursor":     "",
+					"endCursor":       "",
+				},
+				"totalCount": 2,
+			},
+		},
+	})
+
+	mockResponseOrgLevel = githubv4mock.DataResponse(map[string]any{
+		"repository": map[string]any{
+			"discussions": map[string]any{
+				"nodes": discussionsOrgLevel,
+				"pageInfo": map[string]any{
+					"hasNextPage":     false,
+					"hasPreviousPage": false,
+					"startCursor":     "",
+					"endCursor":       "",
+				},
+				"totalCount": 4,
+			},
+		},
+	})
+
 	mockErrorRepoNotFound = githubv4mock.ErrorResponse("repository not found")
 )
 
 func Test_ListDiscussions(t *testing.T) {
 	mockClient := githubv4.NewClient(nil)
-	// Verify tool definition and schema
 	toolDef, _ := ListDiscussions(stubGetGQLClientFn(mockClient), translations.NullTranslationHelper)
 	assert.Equal(t, "list_discussions", toolDef.Name)
 	assert.NotEmpty(t, toolDef.Description)
 	assert.Contains(t, toolDef.InputSchema.Properties, "owner")
 	assert.Contains(t, toolDef.InputSchema.Properties, "repo")
-	assert.ElementsMatch(t, toolDef.InputSchema.Required, []string{"owner", "repo"})
+	assert.Contains(t, toolDef.InputSchema.Properties, "orderBy")
+	assert.Contains(t, toolDef.InputSchema.Properties, "direction")
+	assert.ElementsMatch(t, toolDef.InputSchema.Required, []string{"owner"})
 
-	// mock for the call to ListDiscussions without category filter
-	var qDiscussions struct {
-		Repository struct {
-			Discussions struct {
-				Nodes []struct {
-					Number    githubv4.Int
-					Title     githubv4.String
-					CreatedAt githubv4.DateTime
-					Category  struct {
-						Name githubv4.String
-					} `graphql:"category"`
-					URL githubv4.String `graphql:"url"`
-				}
-			} `graphql:"discussions(first: 100)"`
-		} `graphql:"repository(owner: $owner, name: $repo)"`
-	}
-
-	// mock for the call to get discussions with category filter
-	var qDiscussionsFiltered struct {
-		Repository struct {
-			Discussions struct {
-				Nodes []struct {
-					Number    githubv4.Int
-					Title     githubv4.String
-					CreatedAt githubv4.DateTime
-					Category  struct {
-						Name githubv4.String
-					} `graphql:"category"`
-					URL githubv4.String `graphql:"url"`
-				}
-			} `graphql:"discussions(first: 100, categoryId: $categoryId)"`
-		} `graphql:"repository(owner: $owner, name: $repo)"`
-	}
-
+	// Variables matching what GraphQL receives after JSON marshaling/unmarshaling
 	varsListAll := map[string]interface{}{
-		"owner": githubv4.String("owner"),
-		"repo":  githubv4.String("repo"),
+		"owner": "owner",
+		"repo":  "repo",
+		"first": float64(30),
+		"after": (*string)(nil),
 	}
 
 	varsRepoNotFound := map[string]interface{}{
-		"owner": githubv4.String("owner"),
-		"repo":  githubv4.String("nonexistent-repo"),
+		"owner": "owner",
+		"repo":  "nonexistent-repo",
+		"first": float64(30),
+		"after": (*string)(nil),
 	}
 
 	varsDiscussionsFiltered := map[string]interface{}{
-		"owner":      githubv4.String("owner"),
-		"repo":       githubv4.String("repo"),
-		"categoryId": githubv4.ID("DIC_kwDOABC123"),
+		"owner":      "owner",
+		"repo":       "repo",
+		"categoryId": "DIC_kwDOABC123",
+		"first":      float64(30),
+		"after":      (*string)(nil),
+	}
+
+	varsOrderByCreatedAsc := map[string]interface{}{
+		"owner":            "owner",
+		"repo":             "repo",
+		"orderByField":     "CREATED_AT",
+		"orderByDirection": "ASC",
+		"first":            float64(30),
+		"after":            (*string)(nil),
+	}
+
+	varsOrderByUpdatedDesc := map[string]interface{}{
+		"owner":            "owner",
+		"repo":             "repo",
+		"orderByField":     "UPDATED_AT",
+		"orderByDirection": "DESC",
+		"first":            float64(30),
+		"after":            (*string)(nil),
+	}
+
+	varsCategoryWithOrder := map[string]interface{}{
+		"owner":            "owner",
+		"repo":             "repo",
+		"categoryId":       "DIC_kwDOABC123",
+		"orderByField":     "CREATED_AT",
+		"orderByDirection": "DESC",
+		"first":            float64(30),
+		"after":            (*string)(nil),
+	}
+
+	varsOrgLevel := map[string]interface{}{
+		"owner": "owner",
+		"repo":  ".github", // This is what gets set when repo is not provided
+		"first": float64(30),
+		"after": (*string)(nil),
 	}
 
 	tests := []struct {
@@ -104,6 +272,7 @@ func Test_ListDiscussions(t *testing.T) {
 		expectError   bool
 		errContains   string
 		expectedCount int
+		verifyOrder   func(t *testing.T, discussions []*github.Discussion)
 	}{
 		{
 			name: "list all discussions without category filter",
@@ -125,6 +294,80 @@ func Test_ListDiscussions(t *testing.T) {
 			expectedCount: 2, // Only General discussions (matching the category ID)
 		},
 		{
+			name: "order by created at ascending",
+			reqParams: map[string]interface{}{
+				"owner":     "owner",
+				"repo":      "repo",
+				"orderBy":   "CREATED_AT",
+				"direction": "ASC",
+			},
+			expectError:   false,
+			expectedCount: 3,
+			verifyOrder: func(t *testing.T, discussions []*github.Discussion) {
+				// Verify discussions are ordered by created date ascending
+				require.Len(t, discussions, 3)
+				assert.Equal(t, 1, *discussions[0].Number, "First should be discussion 1 (created 2023-01-01)")
+				assert.Equal(t, 2, *discussions[1].Number, "Second should be discussion 2 (created 2023-02-01)")
+				assert.Equal(t, 3, *discussions[2].Number, "Third should be discussion 3 (created 2023-03-01)")
+			},
+		},
+		{
+			name: "order by updated at descending",
+			reqParams: map[string]interface{}{
+				"owner":     "owner",
+				"repo":      "repo",
+				"orderBy":   "UPDATED_AT",
+				"direction": "DESC",
+			},
+			expectError:   false,
+			expectedCount: 3,
+			verifyOrder: func(t *testing.T, discussions []*github.Discussion) {
+				// Verify discussions are ordered by updated date descending
+				require.Len(t, discussions, 3)
+				assert.Equal(t, 3, *discussions[0].Number, "First should be discussion 3 (updated 2023-03-01)")
+				assert.Equal(t, 2, *discussions[1].Number, "Second should be discussion 2 (updated 2023-02-01)")
+				assert.Equal(t, 1, *discussions[2].Number, "Third should be discussion 1 (updated 2023-01-01)")
+			},
+		},
+		{
+			name: "filter by category with order",
+			reqParams: map[string]interface{}{
+				"owner":     "owner",
+				"repo":      "repo",
+				"category":  "DIC_kwDOABC123",
+				"orderBy":   "CREATED_AT",
+				"direction": "DESC",
+			},
+			expectError:   false,
+			expectedCount: 2,
+			verifyOrder: func(t *testing.T, discussions []*github.Discussion) {
+				// Verify only General discussions, ordered by created date descending
+				require.Len(t, discussions, 2)
+				assert.Equal(t, 3, *discussions[0].Number, "First should be discussion 3 (created 2023-03-01)")
+				assert.Equal(t, 1, *discussions[1].Number, "Second should be discussion 1 (created 2023-01-01)")
+			},
+		},
+		{
+			name: "order by without direction (should not use ordering)",
+			reqParams: map[string]interface{}{
+				"owner":   "owner",
+				"repo":    "repo",
+				"orderBy": "CREATED_AT",
+			},
+			expectError:   false,
+			expectedCount: 3,
+		},
+		{
+			name: "direction without order by (should not use ordering)",
+			reqParams: map[string]interface{}{
+				"owner":     "owner",
+				"repo":      "repo",
+				"direction": "DESC",
+			},
+			expectError:   false,
+			expectedCount: 3,
+		},
+		{
 			name: "repository not found error",
 			reqParams: map[string]interface{}{
 				"owner": "owner",
@@ -133,7 +376,22 @@ func Test_ListDiscussions(t *testing.T) {
 			expectError: true,
 			errContains: "repository not found",
 		},
+		{
+			name: "list org-level discussions (no repo provided)",
+			reqParams: map[string]interface{}{
+				"owner": "owner",
+				// repo is not provided, it will default to ".github"
+			},
+			expectError:   false,
+			expectedCount: 4,
+		},
 	}
+
+	// Define the actual query strings that match the implementation
+	qBasicNoOrder := "query($after:String$first:Int!$owner:String!$repo:String!){repository(owner: $owner, name: $repo){discussions(first: $first, after: $after){nodes{number,title,createdAt,updatedAt,author{login},category{name},url},pageInfo{hasNextPage,hasPreviousPage,startCursor,endCursor},totalCount}}}"
+	qWithCategoryNoOrder := "query($after:String$categoryId:ID!$first:Int!$owner:String!$repo:String!){repository(owner: $owner, name: $repo){discussions(first: $first, after: $after, categoryId: $categoryId){nodes{number,title,createdAt,updatedAt,author{login},category{name},url},pageInfo{hasNextPage,hasPreviousPage,startCursor,endCursor},totalCount}}}"
+	qBasicWithOrder := "query($after:String$first:Int!$orderByDirection:OrderDirection!$orderByField:DiscussionOrderField!$owner:String!$repo:String!){repository(owner: $owner, name: $repo){discussions(first: $first, after: $after, orderBy: { field: $orderByField, direction: $orderByDirection }){nodes{number,title,createdAt,updatedAt,author{login},category{name},url},pageInfo{hasNextPage,hasPreviousPage,startCursor,endCursor},totalCount}}}"
+	qWithCategoryAndOrder := "query($after:String$categoryId:ID!$first:Int!$orderByDirection:OrderDirection!$orderByField:DiscussionOrderField!$owner:String!$repo:String!){repository(owner: $owner, name: $repo){discussions(first: $first, after: $after, categoryId: $categoryId, orderBy: { field: $orderByField, direction: $orderByDirection }){nodes{number,title,createdAt,updatedAt,author{login},category{name},url},pageInfo{hasNextPage,hasPreviousPage,startCursor,endCursor},totalCount}}}"
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -141,15 +399,31 @@ func Test_ListDiscussions(t *testing.T) {
 
 			switch tc.name {
 			case "list all discussions without category filter":
-				// Simple case - no category filter
-				matcher := githubv4mock.NewQueryMatcher(qDiscussions, varsListAll, mockResponseListAll)
+				matcher := githubv4mock.NewQueryMatcher(qBasicNoOrder, varsListAll, mockResponseListAll)
 				httpClient = githubv4mock.NewMockedHTTPClient(matcher)
 			case "filter by category ID":
-				// Simple case - category filter using category ID directly
-				matcher := githubv4mock.NewQueryMatcher(qDiscussionsFiltered, varsDiscussionsFiltered, mockResponseListGeneral)
+				matcher := githubv4mock.NewQueryMatcher(qWithCategoryNoOrder, varsDiscussionsFiltered, mockResponseListGeneral)
+				httpClient = githubv4mock.NewMockedHTTPClient(matcher)
+			case "order by created at ascending":
+				matcher := githubv4mock.NewQueryMatcher(qBasicWithOrder, varsOrderByCreatedAsc, mockResponseOrderedCreatedAsc)
+				httpClient = githubv4mock.NewMockedHTTPClient(matcher)
+			case "order by updated at descending":
+				matcher := githubv4mock.NewQueryMatcher(qBasicWithOrder, varsOrderByUpdatedDesc, mockResponseOrderedUpdatedDesc)
+				httpClient = githubv4mock.NewMockedHTTPClient(matcher)
+			case "filter by category with order":
+				matcher := githubv4mock.NewQueryMatcher(qWithCategoryAndOrder, varsCategoryWithOrder, mockResponseGeneralOrderedDesc)
+				httpClient = githubv4mock.NewMockedHTTPClient(matcher)
+			case "order by without direction (should not use ordering)":
+				matcher := githubv4mock.NewQueryMatcher(qBasicNoOrder, varsListAll, mockResponseListAll)
+				httpClient = githubv4mock.NewMockedHTTPClient(matcher)
+			case "direction without order by (should not use ordering)":
+				matcher := githubv4mock.NewQueryMatcher(qBasicNoOrder, varsListAll, mockResponseListAll)
 				httpClient = githubv4mock.NewMockedHTTPClient(matcher)
 			case "repository not found error":
-				matcher := githubv4mock.NewQueryMatcher(qDiscussions, varsRepoNotFound, mockErrorRepoNotFound)
+				matcher := githubv4mock.NewQueryMatcher(qBasicNoOrder, varsRepoNotFound, mockErrorRepoNotFound)
+				httpClient = githubv4mock.NewMockedHTTPClient(matcher)
+			case "list org-level discussions (no repo provided)":
+				matcher := githubv4mock.NewQueryMatcher(qBasicNoOrder, varsOrgLevel, mockResponseOrgLevel)
 				httpClient = githubv4mock.NewMockedHTTPClient(matcher)
 			}
 
@@ -167,15 +441,30 @@ func Test_ListDiscussions(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			var returnedDiscussions []*github.Discussion
-			err = json.Unmarshal([]byte(text), &returnedDiscussions)
+			// Parse the structured response with pagination info
+			var response struct {
+				Discussions []*github.Discussion `json:"discussions"`
+				PageInfo    struct {
+					HasNextPage     bool   `json:"hasNextPage"`
+					HasPreviousPage bool   `json:"hasPreviousPage"`
+					StartCursor     string `json:"startCursor"`
+					EndCursor       string `json:"endCursor"`
+				} `json:"pageInfo"`
+				TotalCount int `json:"totalCount"`
+			}
+			err = json.Unmarshal([]byte(text), &response)
 			require.NoError(t, err)
 
-			assert.Len(t, returnedDiscussions, tc.expectedCount, "Expected %d discussions, got %d", tc.expectedCount, len(returnedDiscussions))
+			assert.Len(t, response.Discussions, tc.expectedCount, "Expected %d discussions, got %d", tc.expectedCount, len(response.Discussions))
+
+			// Verify order if verifyOrder function is provided
+			if tc.verifyOrder != nil {
+				tc.verifyOrder(t, response.Discussions)
+			}
 
 			// Verify that all returned discussions have a category if filtered
 			if _, hasCategory := tc.reqParams["category"]; hasCategory {
-				for _, discussion := range returnedDiscussions {
+				for _, discussion := range response.Discussions {
 					require.NotNil(t, discussion.DiscussionCategory, "Discussion should have category")
 					assert.NotEmpty(t, *discussion.DiscussionCategory.Name, "Discussion should have category name")
 				}
@@ -194,23 +483,13 @@ func Test_GetDiscussion(t *testing.T) {
 	assert.Contains(t, toolDef.InputSchema.Properties, "discussionNumber")
 	assert.ElementsMatch(t, toolDef.InputSchema.Required, []string{"owner", "repo", "discussionNumber"})
 
-	var q struct {
-		Repository struct {
-			Discussion struct {
-				Number    githubv4.Int
-				Body      githubv4.String
-				CreatedAt githubv4.DateTime
-				URL       githubv4.String `graphql:"url"`
-				Category  struct {
-					Name githubv4.String
-				} `graphql:"category"`
-			} `graphql:"discussion(number: $discussionNumber)"`
-		} `graphql:"repository(owner: $owner, name: $repo)"`
-	}
+	// Use exact string query that matches implementation output
+	qGetDiscussion := "query($discussionNumber:Int!$owner:String!$repo:String!){repository(owner: $owner, name: $repo){discussion(number: $discussionNumber){number,title,body,createdAt,url,category{name}}}}"
+
 	vars := map[string]interface{}{
-		"owner":            githubv4.String("owner"),
-		"repo":             githubv4.String("repo"),
-		"discussionNumber": githubv4.Int(1),
+		"owner":            "owner",
+		"repo":             "repo",
+		"discussionNumber": float64(1),
 	}
 	tests := []struct {
 		name        string
@@ -224,6 +503,7 @@ func Test_GetDiscussion(t *testing.T) {
 			response: githubv4mock.DataResponse(map[string]any{
 				"repository": map[string]any{"discussion": map[string]any{
 					"number":    1,
+					"title":     "Test Discussion Title",
 					"body":      "This is a test discussion",
 					"url":       "https://github.com/owner/repo/discussions/1",
 					"createdAt": "2025-04-25T12:00:00Z",
@@ -234,6 +514,7 @@ func Test_GetDiscussion(t *testing.T) {
 			expected: &github.Discussion{
 				HTMLURL:   github.Ptr("https://github.com/owner/repo/discussions/1"),
 				Number:    github.Ptr(1),
+				Title:     github.Ptr("Test Discussion Title"),
 				Body:      github.Ptr("This is a test discussion"),
 				CreatedAt: &github.Timestamp{Time: time.Date(2025, 4, 25, 12, 0, 0, 0, time.UTC)},
 				DiscussionCategory: &github.DiscussionCategory{
@@ -250,7 +531,7 @@ func Test_GetDiscussion(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			matcher := githubv4mock.NewQueryMatcher(q, vars, tc.response)
+			matcher := githubv4mock.NewQueryMatcher(qGetDiscussion, vars, tc.response)
 			httpClient := githubv4mock.NewMockedHTTPClient(matcher)
 			gqlClient := githubv4.NewClient(httpClient)
 			_, handler := GetDiscussion(stubGetGQLClientFn(gqlClient), translations.NullTranslationHelper)
@@ -270,6 +551,7 @@ func Test_GetDiscussion(t *testing.T) {
 			require.NoError(t, json.Unmarshal([]byte(text), &out))
 			assert.Equal(t, *tc.expected.HTMLURL, *out.HTMLURL)
 			assert.Equal(t, *tc.expected.Number, *out.Number)
+			assert.Equal(t, *tc.expected.Title, *out.Title)
 			assert.Equal(t, *tc.expected.Body, *out.Body)
 			// Check category label
 			assert.Equal(t, *tc.expected.DiscussionCategory.Name, *out.DiscussionCategory.Name)
@@ -287,22 +569,18 @@ func Test_GetDiscussionComments(t *testing.T) {
 	assert.Contains(t, toolDef.InputSchema.Properties, "discussionNumber")
 	assert.ElementsMatch(t, toolDef.InputSchema.Required, []string{"owner", "repo", "discussionNumber"})
 
-	var q struct {
-		Repository struct {
-			Discussion struct {
-				Comments struct {
-					Nodes []struct {
-						Body githubv4.String
-					}
-				} `graphql:"comments(first:100)"`
-			} `graphql:"discussion(number: $discussionNumber)"`
-		} `graphql:"repository(owner: $owner, name: $repo)"`
-	}
+	// Use exact string query that matches implementation output
+	qGetComments := "query($after:String$discussionNumber:Int!$first:Int!$owner:String!$repo:String!){repository(owner: $owner, name: $repo){discussion(number: $discussionNumber){comments(first: $first, after: $after){nodes{body},pageInfo{hasNextPage,hasPreviousPage,startCursor,endCursor},totalCount}}}}"
+
+	// Variables matching what GraphQL receives after JSON marshaling/unmarshaling
 	vars := map[string]interface{}{
-		"owner":            githubv4.String("owner"),
-		"repo":             githubv4.String("repo"),
-		"discussionNumber": githubv4.Int(1),
+		"owner":            "owner",
+		"repo":             "repo",
+		"discussionNumber": float64(1),
+		"first":            float64(30),
+		"after":            (*string)(nil),
 	}
+
 	mockResponse := githubv4mock.DataResponse(map[string]any{
 		"repository": map[string]any{
 			"discussion": map[string]any{
@@ -311,11 +589,18 @@ func Test_GetDiscussionComments(t *testing.T) {
 						{"body": "This is the first comment"},
 						{"body": "This is the second comment"},
 					},
+					"pageInfo": map[string]any{
+						"hasNextPage":     false,
+						"hasPreviousPage": false,
+						"startCursor":     "",
+						"endCursor":       "",
+					},
+					"totalCount": 2,
 				},
 			},
 		},
 	})
-	matcher := githubv4mock.NewQueryMatcher(q, vars, mockResponse)
+	matcher := githubv4mock.NewQueryMatcher(qGetComments, vars, mockResponse)
 	httpClient := githubv4mock.NewMockedHTTPClient(matcher)
 	gqlClient := githubv4.NewClient(httpClient)
 	_, handler := GetDiscussionComments(stubGetGQLClientFn(gqlClient), translations.NullTranslationHelper)
@@ -331,62 +616,163 @@ func Test_GetDiscussionComments(t *testing.T) {
 
 	textContent := getTextResult(t, result)
 
-	var returnedComments []*github.IssueComment
-	err = json.Unmarshal([]byte(textContent.Text), &returnedComments)
+	// (Lines removed)
+
+	var response struct {
+		Comments []*github.IssueComment `json:"comments"`
+		PageInfo struct {
+			HasNextPage     bool   `json:"hasNextPage"`
+			HasPreviousPage bool   `json:"hasPreviousPage"`
+			StartCursor     string `json:"startCursor"`
+			EndCursor       string `json:"endCursor"`
+		} `json:"pageInfo"`
+		TotalCount int `json:"totalCount"`
+	}
+	err = json.Unmarshal([]byte(textContent.Text), &response)
 	require.NoError(t, err)
-	assert.Len(t, returnedComments, 2)
+	assert.Len(t, response.Comments, 2)
 	expectedBodies := []string{"This is the first comment", "This is the second comment"}
-	for i, comment := range returnedComments {
+	for i, comment := range response.Comments {
 		assert.Equal(t, expectedBodies[i], *comment.Body)
 	}
 }
 
 func Test_ListDiscussionCategories(t *testing.T) {
-	var q struct {
-		Repository struct {
-			DiscussionCategories struct {
-				Nodes []struct {
-					ID   githubv4.ID
-					Name githubv4.String
-				}
-			} `graphql:"discussionCategories(first: 100)"`
-		} `graphql:"repository(owner: $owner, name: $repo)"`
+	mockClient := githubv4.NewClient(nil)
+	toolDef, _ := ListDiscussionCategories(stubGetGQLClientFn(mockClient), translations.NullTranslationHelper)
+	assert.Equal(t, "list_discussion_categories", toolDef.Name)
+	assert.NotEmpty(t, toolDef.Description)
+	assert.Contains(t, toolDef.Description, "or organisation")
+	assert.Contains(t, toolDef.InputSchema.Properties, "owner")
+	assert.Contains(t, toolDef.InputSchema.Properties, "repo")
+	assert.ElementsMatch(t, toolDef.InputSchema.Required, []string{"owner"})
+
+	// Use exact string query that matches implementation output
+	qListCategories := "query($first:Int!$owner:String!$repo:String!){repository(owner: $owner, name: $repo){discussionCategories(first: $first){nodes{id,name},pageInfo{hasNextPage,hasPreviousPage,startCursor,endCursor},totalCount}}}"
+
+	// Variables for repository-level categories
+	varsRepo := map[string]interface{}{
+		"owner": "owner",
+		"repo":  "repo",
+		"first": float64(25),
 	}
-	vars := map[string]interface{}{
-		"owner": githubv4.String("owner"),
-		"repo":  githubv4.String("repo"),
+
+	// Variables for organization-level categories (using .github repo)
+	varsOrg := map[string]interface{}{
+		"owner": "owner",
+		"repo":  ".github",
+		"first": float64(25),
 	}
-	mockResp := githubv4mock.DataResponse(map[string]any{
+
+	mockRespRepo := githubv4mock.DataResponse(map[string]any{
 		"repository": map[string]any{
 			"discussionCategories": map[string]any{
 				"nodes": []map[string]any{
 					{"id": "123", "name": "CategoryOne"},
 					{"id": "456", "name": "CategoryTwo"},
 				},
+				"pageInfo": map[string]any{
+					"hasNextPage":     false,
+					"hasPreviousPage": false,
+					"startCursor":     "",
+					"endCursor":       "",
+				},
+				"totalCount": 2,
 			},
 		},
 	})
-	matcher := githubv4mock.NewQueryMatcher(q, vars, mockResp)
-	httpClient := githubv4mock.NewMockedHTTPClient(matcher)
-	gqlClient := githubv4.NewClient(httpClient)
 
-	tool, handler := ListDiscussionCategories(stubGetGQLClientFn(gqlClient), translations.NullTranslationHelper)
-	assert.Equal(t, "list_discussion_categories", tool.Name)
-	assert.NotEmpty(t, tool.Description)
-	assert.Contains(t, tool.InputSchema.Properties, "owner")
-	assert.Contains(t, tool.InputSchema.Properties, "repo")
-	assert.ElementsMatch(t, tool.InputSchema.Required, []string{"owner", "repo"})
+	mockRespOrg := githubv4mock.DataResponse(map[string]any{
+		"repository": map[string]any{
+			"discussionCategories": map[string]any{
+				"nodes": []map[string]any{
+					{"id": "789", "name": "Announcements"},
+					{"id": "101", "name": "General"},
+					{"id": "112", "name": "Ideas"},
+				},
+				"pageInfo": map[string]any{
+					"hasNextPage":     false,
+					"hasPreviousPage": false,
+					"startCursor":     "",
+					"endCursor":       "",
+				},
+				"totalCount": 3,
+			},
+		},
+	})
 
-	request := createMCPRequest(map[string]interface{}{"owner": "owner", "repo": "repo"})
-	result, err := handler(context.Background(), request)
-	require.NoError(t, err)
+	tests := []struct {
+		name               string
+		reqParams          map[string]interface{}
+		vars               map[string]interface{}
+		mockResponse       githubv4mock.GQLResponse
+		expectError        bool
+		expectedCount      int
+		expectedCategories []map[string]string
+	}{
+		{
+			name: "list repository-level discussion categories",
+			reqParams: map[string]interface{}{
+				"owner": "owner",
+				"repo":  "repo",
+			},
+			vars:          varsRepo,
+			mockResponse:  mockRespRepo,
+			expectError:   false,
+			expectedCount: 2,
+			expectedCategories: []map[string]string{
+				{"id": "123", "name": "CategoryOne"},
+				{"id": "456", "name": "CategoryTwo"},
+			},
+		},
+		{
+			name: "list org-level discussion categories (no repo provided)",
+			reqParams: map[string]interface{}{
+				"owner": "owner",
+				// repo is not provided, it will default to ".github"
+			},
+			vars:          varsOrg,
+			mockResponse:  mockRespOrg,
+			expectError:   false,
+			expectedCount: 3,
+			expectedCategories: []map[string]string{
+				{"id": "789", "name": "Announcements"},
+				{"id": "101", "name": "General"},
+				{"id": "112", "name": "Ideas"},
+			},
+		},
+	}
 
-	text := getTextResult(t, result).Text
-	var categories []map[string]string
-	require.NoError(t, json.Unmarshal([]byte(text), &categories))
-	assert.Len(t, categories, 2)
-	assert.Equal(t, "123", categories[0]["id"])
-	assert.Equal(t, "CategoryOne", categories[0]["name"])
-	assert.Equal(t, "456", categories[1]["id"])
-	assert.Equal(t, "CategoryTwo", categories[1]["name"])
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			matcher := githubv4mock.NewQueryMatcher(qListCategories, tc.vars, tc.mockResponse)
+			httpClient := githubv4mock.NewMockedHTTPClient(matcher)
+			gqlClient := githubv4.NewClient(httpClient)
+
+			_, handler := ListDiscussionCategories(stubGetGQLClientFn(gqlClient), translations.NullTranslationHelper)
+
+			req := createMCPRequest(tc.reqParams)
+			res, err := handler(context.Background(), req)
+			text := getTextResult(t, res).Text
+
+			if tc.expectError {
+				require.True(t, res.IsError)
+				return
+			}
+			require.NoError(t, err)
+
+			var response struct {
+				Categories []map[string]string `json:"categories"`
+				PageInfo   struct {
+					HasNextPage     bool   `json:"hasNextPage"`
+					HasPreviousPage bool   `json:"hasPreviousPage"`
+					StartCursor     string `json:"startCursor"`
+					EndCursor       string `json:"endCursor"`
+				} `json:"pageInfo"`
+				TotalCount int `json:"totalCount"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(text), &response))
+			assert.Equal(t, tc.expectedCategories, response.Categories)
+		})
+	}
 }

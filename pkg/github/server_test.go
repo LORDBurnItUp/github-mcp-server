@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/github/github-mcp-server/pkg/raw"
-	"github.com/google/go-github/v73/github"
+	"github.com/google/go-github/v77/github"
 	"github.com/shurcooL/githubv4"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,6 +35,12 @@ func stubGetClientFnErr(err string) GetClientFn {
 func stubGetGQLClientFn(client *githubv4.Client) GetGQLClientFn {
 	return func(_ context.Context) (*githubv4.Client, error) {
 		return client, nil
+	}
+}
+
+func stubFeatureFlags(enabledFlags map[string]bool) FeatureFlags {
+	return FeatureFlags{
+		LockdownMode: enabledFlags["lockdown-mode"],
 	}
 }
 
@@ -489,8 +495,8 @@ func TestOptionalPaginationParams(t *testing.T) {
 			name:   "no pagination parameters, default values",
 			params: map[string]any{},
 			expected: PaginationParams{
-				page:    1,
-				perPage: 30,
+				Page:    1,
+				PerPage: 30,
 			},
 			expectError: false,
 		},
@@ -500,8 +506,8 @@ func TestOptionalPaginationParams(t *testing.T) {
 				"page": float64(2),
 			},
 			expected: PaginationParams{
-				page:    2,
-				perPage: 30,
+				Page:    2,
+				PerPage: 30,
 			},
 			expectError: false,
 		},
@@ -511,8 +517,8 @@ func TestOptionalPaginationParams(t *testing.T) {
 				"perPage": float64(50),
 			},
 			expected: PaginationParams{
-				page:    1,
-				perPage: 50,
+				Page:    1,
+				PerPage: 50,
 			},
 			expectError: false,
 		},
@@ -523,8 +529,8 @@ func TestOptionalPaginationParams(t *testing.T) {
 				"perPage": float64(50),
 			},
 			expected: PaginationParams{
-				page:    2,
-				perPage: 50,
+				Page:    2,
+				PerPage: 50,
 			},
 			expectError: false,
 		},
